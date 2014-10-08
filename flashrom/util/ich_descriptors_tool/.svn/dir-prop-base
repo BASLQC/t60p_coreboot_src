@@ -1,0 +1,9 @@
+K 10
+svn:ignore
+V 56
+ich_descriptors_tool
+ich_descriptors_tool.exe
+.dep
+.obj
+
+END

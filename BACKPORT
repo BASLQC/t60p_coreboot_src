@@ -1,0 +1,84 @@
+Modifications (for 5th release, June 5th revision) to the coreboot(deblobbed) source code compared to previous revision of the 5th release.
+
+Based on http://review.coreboot.org/#/c/5893
+(patch set 1)
+
+Modify uma_memory_base according to 17fec8a kernel commit.
+
+libreboot_src/coreboot/src/northbridge/intel/i945/gma.c:
+
+67c67,71
+< 	i915lightup(uma_memory_base+256*KiB, iobase, mmiobase, graphics_base);
+---
+> 
+> 	// backport. see http://review.coreboot.org/#/c/5893/1/src/northbridge/intel/i945/gma.c
+> 	uma_memory_base = pci_read_config32(dev, 0x5c) & ~((1<<20) - 1);
+> 
+> 	i915lightup(uma_memory_base, iobase, mmiobase, graphics_base);
+
+____________________________________________________________________________________________________________________________________________
+
+Based on http://review.coreboot.org/#/c/5927/
+(patch set 3)
+
+Modify PGETBL_CTL to the value found from VBIOS
+
+libreboot_src/coreboot/src/mainboard/lenovo/x60/i915.c:
+
+67c67,71
+< 	i915lightup(uma_memory_base+256*KiB, iobase, mmiobase, graphics_base);
+---
+> 
+> 	// backport. see http://review.coreboot.org/#/c/5893/1/src/northbridge/intel/i945/gma.c
+> 	uma_memory_base = pci_read_config32(dev, 0x5c) & ~((1<<20) - 1);
+> 
+> 	i915lightup(uma_memory_base, iobase, mmiobase, graphics_base);
+user@user-ThinkPad-T60:~/Desktop/RELEASE$ diff libreboot_src/coreboot/src/mainboard/lenovo/x60/i915.c ../libreboot_src/coreboot/src/mainboard/lenovo/x60/i915.c
+138c138,145
+< 	PGETBL_save = read32(mmiobase + PGETBL_CTL) & ~PGETBL_ENABLED;
+---
+> 	// backport changes. see http://review.coreboot.org/#/c/5927/3/src/mainboard/lenovo/x60/i915.c
+> 	PGETBL_save = read32(mmiobase + PGETBL_CTL);
+> 	printk(BIOS_DEBUG, "%s: GTT PGETLB_CTL register (original): 0x%lx\n", __func__, PGETBL_save);
+> 
+> 	PGETBL_save &= ~PGETBL_ENABLED;
+> 	printk(BIOS_DEBUG, "%s: GTT PGETLB_CTL register (&= ~PGETBL_ENABLED): 0x%lx\n", __func__, PGETBL_save);
+> 	//end backport changes
+> 
+140a148,150
+> 	// backport change: http://review.coreboot.org/#/c/5927/3/src/mainboard/lenovo/x60/i915.c
+> 	printk(BIOS_DEBUG, "%s: GTT PGETLB_CTL register: 0x%lx\n", __func__, PGETBL_save);
+> 	// end
+141a152,154
+> 	// backport change: http://review.coreboot.org/#/c/5927/3/src/mainboard/lenovo/x60/i915.c
+> 	printk(BIOS_DEBUG, "%s: GTT PGETLB_CTL register: 0x%lx\n", __func__, PGETBL_save);
+> 	// end
+142a156,161
+> 	// backport change: http://review.coreboot.org/#/c/5927/3/src/mainboard/lenovo/x60/i915.c
+> 	printk(BIOS_DEBUG, "%s: GTT PGETLB_CTL register: 0x%lx\n", __func__, PGETBL_save);
+> 
+> 	PGETBL_save += 0x7c0000;
+> 	printk(BIOS_DEBUG, "%s: GTT PGETLB_CTL register (added 0x7c0000 for VBIOS value): 0x%lx\n", __func__, PGETBL_save);
+> 	// end
+149,150c168,172
+< 	if (read32(mmiobase + PGETBL_CTL) & PGETBL_ENABLED) {
+< 		printk(BIOS_DEBUG, "gtt_setup is enabled.\n");
+---
+> 	// backport change: http://review.coreboot.org/#/c/5927/3/src/mainboard/lenovo/x60/i915.c
+> 	PGETBL_save = read32(mmiobase + PGETBL_CTL);
+> 	if (PGETBL_save & PGETBL_ENABLED) {
+> 		printk(BIOS_DEBUG, "gtt_setup is enabled: GTT PGETLB_CTL register: 0x%lx\n", PGETBL_save);
+> 	// end
+
+____________________________________________________________________________________________________________________________________________
+
+Based on information at http://libreboot.org/howto.html#x60_native_notes
+
+libreboot_src/coreboot/src/mainboard/lenovo/x60/i915io.c:
+
+1233c1233
+< {W, 1, "", BLC_PWM_CTL, 0x00000002, 0},
+---
+> {W, 1, "", BLC_PWM_CTL, 0x879F879E, 0},
+
+

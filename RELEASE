@@ -1,0 +1,187 @@
+5th release.
+
+ - Coreboot payload: GRUB2
+ - GRUB2 payload: MemTest86+
+
+ - Non-free microcode updates removed from coreboot
+ - Native graphics support (replaces the nonfree VBIOS / VGA option ROM)
+ - thinkpad_acpi support (needed for the backlight and other things)
+
+ - Source code 100% free and deblobbed.
+
+------------------------------
+
+5th release.
+2014 March 7th
+Revised 2014 March 9th (see notes)
+revised 2014 June 22nd (see notes)
+
+Compiled version () (pre-compiled coreboot.rom, flashrom/bucts source code. Documentation.):
+ - useful if you just want to flash the new version:
+ - http://libreboot.org/release/4/libreboot_bin.tar.gz
+
+Source code () (coreboot, bucts, flashrom, grub2, memtest86+. Config files. Documentation.):
+ - useful if you want to study and hack the source code:
+ - http://libreboot.org/release/4/libreboot_src.tar.gz
+
+(gluglug.org.uk/X60/release/4/X60_source.tar.gz and gluglug.org.uk/X60/release/4/X60_binary.tar.gz were the old links)
+
+Binary archive now have 2 images:
+ - With serial output enabled and memtest86+ included (debug level 8 in coreboot)
+ - With serial output disabled and memtest86+ excluded (faster boot speeds) (debugging disabled)
+
+Reduced impact on battery life:
+ - "processor.max_cstate=2" instead of "idle=halt" for booting default kernel
+
+coreboot.rom (faster boot speeds, debugging disabled):
+ - Disabled coreboot serial output (Console-> in "make menuconfig")
+ - Set coreboot debug level to 0 instead of 8 (Console-> in "make menuconfig")
+ - Changed GRUB timeout to 1 second instead of 2 (in grub.cfg
+ - Removed background image in GRUB.
+ - Removed memtest86+ payload (since it relies on serial output)
+
+coreboot_serial.rom (slower boot speeds, debugging enabled):
+ - Boot time still reduced, but only by ~2 seconds
+ - has the memtest86+ payload included in the ROM
+ - has serial port enabled. How this is achieved (from X60_source):
+ - Turn on debugging level to 8, and enable serial output
+(in Console-> in coreboot "make menuconfig")
+(and build with grub_serial.cfg and grub_memdisk_serial.cfg)
+
+Revision 1 (2014 March 9th):
+ - recreated coreboot config from scratch
+ - GRUB loads even faster now (less than 2 seconds).
+ - Total boot time reduced by further ~5 seconds.
+ - Added crypto and cryptodisk modules to GRUB
+ - cbfstool now included in the binary archives
+
+Revision 2 (2014 June 5th):
+ - added backlight support (Fn+Home and Fn+End) on X60
+ - fixed broken/unstable 3D when using kernel 3.12 or higher
+(see "BACKPORT" file)
+
+Revision 3 (2014 June 11th):
+ - removed "CD" boot option from coreboot.rom (not needed)
+ - removed "processor.max_cstate=2" and "idle=halt" options (see README.powertop file)
+
+Revision 4 (2014 June 22nd)
+ - updated GRUB (git 4b8b9135f1676924a8458da528d264bbc7bbb301, April 20th 2014)
+ - Made "DeJavu Sans Mono" the default font in GRUB (fixes border corruption).
+ - re-added background image in GRUB (meditating GNU)
+ - added 6 more images: 
+ * * coreboot_ukqwerty.rom (UK Qwerty keyboard layout in GRUB)
+ * * coreboot_serial_ukqwerty.rom (UK Qwerty keyboard layout in GRUB)
+ * * coreboot_dvorak.rom (US Dvorak keyboard layout in GRUB)
+ * * coreboot_serial_dvorak.rom (US Dvorak keyboard layout in GRUB)
+ * * coreboot_ukdvorak.rom (UK Dvorak keyboard layout in GRUB)
+ * * coreboot_serial_ukdvorak.rom (UK Dvorak keyboard layout in GRUB)
+ (coreboot.rom and coreboot_serial.rom have US Qwerty keyboard layout in GRUB, as usual)
+ - improved the documentation:
+ * * removed FLASH_INSTRUCTION and README.powertop and merged them with README
+ * * removed obsolete info from README and tidied it up
+ * * deleted README (replaced with docs/index.html)
+ - tidied up the menu entries in GRUB
+ - tidied up the root directory of X60_source/, sorted more files into subdirectories
+ - added "pkg-config" to the list of dependencies for building powertop on Trisquel
+ - wrote a script (powertop.trisquel6) to automatically setup Powertop to run at boot time (for Trisquel 6 users)
+ - improved the commenting inside the 'build' script (should make modifying it easier)
+ - Renamed X60_binary.tar.gz and X60_source.tar.gz to libreboot_bin.tar.gz and libreboot_src.tar.gz, respectively.
+ - Replaced "GNU GRUB version" with "FREE AS IN FREEDOM" on GNU GRUB start screen.
+ - Added sha512.txt files in libreboot_src and libreboot_bin. (inside the archives)
+ - Added libreboot_bin.tar.gz.sha512.txt and libreboot_src.tar.gz.sha512.txt files (outside of the archives)
+
+Revision (2014 June 22nd - extra)
+ - Documentation: Improved the instructions for using flashrom
+ - Documentation: Improved the instructions for using cbfstool (to change the default GRUB menu)
+ - Documentation: Numerous small fixes.
+
+Revision (2014 June 22nd - extra)
+ - Documentation: added "X60 Unbricking tutorial
+ - Documentation: added info about enabling or disabling wifi
+ - Documentation: added info about enabling or disabling trackpoint
+
+------------------------------
+
+4th release.
+2014 February 21st
+
+Compiled version () (pre-compiled coreboot.rom, flashrom/bucts source code. Documentation.):
+ - useful if you just want to flash the new version:
+ - http://gluglug.org.uk/X60/release/3/X60_binary.tar.gz
+
+Source code () (coreboot, bucts, flashrom, grub2, memtest86+. Config files. Documentation.):
+ - useful if you want to study and hack the source code:
+ - http://gluglug.org.uk/X60/release/3/X60_source.tar.gz
+
+Changes:
+ - Removed SeaBIOS (redundant)
+ - New GRUB version (2.02~beta2)
+ --> Fixes some USB issues
+ --> Includes ISOLINUX/SYSLINUX parser
+ - New grub.cfg
+ --> Removed useless options:
+ 		* options for booting sda 2/3/4
+		* seabios boot option
+ - Added new menu entries:
+ --> Parse ISOLINUX config (USB)
+ --> Parse ISOLINUX config (CD)
+ --> Added "cat" module for use on GRUB command line.
+		* "set pager=1" is set in grub.cfg, for less-like functionality
+
+The "Parse" options read ./isolinux/isolinux.cfg on a CD or USB,
+and automatically converts it to a grub config and switches to the boot menu of that distro.
+This makes booting ISO's *much* easier than before.
+
+------------------------------
+
+3rd release.
+2013 December 14th
+
+Compiled version () (pre-compiled coreboot.rom, flashrom/bucts source code. Documentation.):
+ - useful if you just want to flash the new version:
+ - http://gluglug.org.uk/X60/release/2/X60_binary.tar.gz
+
+Source code () (coreboot, bucts, flashrom, grub2, memtest86+. Config files. Documentation.):
+ - useful if you want to study and hack the source code:
+ - http://gluglug.org.uk/X60/release/2/X60_source.tar.gz
+
+Changes:
+ - Added SeaBIOS payload to GRUB2 (for booting USB drives)
+ - new grub.cfg
+
+------------------------------
+
+2nd release.
+2013 December 13th
+
+Compiled version () (pre-compiled coreboot.rom, flashrom/bucts source code. Documentation.):
+ - useful if you just want to flash the new version:
+ - http://gluglug.org.uk/X60/release/1/X60_binary.tar.gz
+
+Source code () (coreboot, bucts, flashrom, grub2, memtest86+. Config files. Documentation.):
+ - useful if you want to study and hack the source code:
+ - http://gluglug.org.uk/X60/release/1/X60_source.tar.gz
+
+Changes:
+ - added background image to GRUB2
+ - added memtest86+ payload to grub2
+ - improvements to the documentation
+ - new grub.cfg
+
+-----------------------------
+
+1st release.
+2013 December 12th
+
+Compiled version (1.5MB) (pre-compiled coreboot.rom, flashrom/bucts source code. Documentation.):
+ - useful if you just want to flash the new version:
+ - http://gluglug.org.uk/X60/release/0/X60_binary.tar.gz
+
+Source code (164.5MB) (coreboot, bucts, flashrom, grub2. Config files. Documentation.):
+ - useful if you want to study and hack the source code:
+ - http://gluglug.org.uk/X60/release/0/X60_source.tar.gz
+
+Changes
+ - initial release
+ - source code 100% free and deblobbed.
+

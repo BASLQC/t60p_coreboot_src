@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# this cleans everything to a default state
+
+# clean coreboot
+cd coreboot
+make clean
+
+# clean cbfstool
+cd util/cbfstool
+make clean
+
+# go back to coreboot dir
+cd ../../
+
+# remove the payloads (they will be built by "build")
+rm -rf grub.elf
+rm -rf grub_serial.elf
+
+# clean reference crossGCC for coreboot
+make crossgcc-clean
+
+# clean grub
+cd ..
+cd grub
+make clean
+
+# clean memtest86+
+cd ..
+cd "memtest86+-5.01"
+make clean
+
+# clean bucts
+cd ..
+cd bucts
+make clean
+
+# clean flashrom
+cd flashrom
+make clean
+
+# now make any changes needed elsewhere, and run "build"
+
+cd ..
+# remove powertop directory (included if the user is on Trisquel 6 and ran "powertop.trisquel6" script
+rm -rf powertop
+# remove the files in the "bin" directory (where the ROM's were moved to after last build)
+rm -rf bin/*
+
+# done

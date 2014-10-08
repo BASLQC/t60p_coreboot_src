@@ -1,0 +1,4 @@
+#!/bin/sh
+/usr/local/sbin/powertop --auto-tune
+echo 'auto' > '/sys/bus/usb/devices/4-2/power/control';
+echo 'auto' > '/sys/bus/usb/devices/4-1/power/control';

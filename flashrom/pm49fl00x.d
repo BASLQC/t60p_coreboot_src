@@ -1,0 +1,1 @@
+pm49fl00x.o: pm49fl00x.c flash.h

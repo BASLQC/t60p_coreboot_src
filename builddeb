@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# For trisquel. Probably will work on others too.
+
+sudo apt-get -y install subversion git
+sudo apt-get -y install build-essential
+sudo apt-get -y install libncurses5-dev doxygen iasl gdb flex bison
+sudo apt-get -y install libpci-dev pciutils zlib1g-dev libftdi-dev
+sudo apt-get -y install bison libopts25 libselinux1-dev autogen m4 autoconf help2man libopts25-dev flex libfont-freetype-perl automake autotools-$
+sudo apt-get -y install ttf-unifont
+

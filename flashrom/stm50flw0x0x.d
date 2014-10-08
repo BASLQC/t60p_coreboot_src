@@ -1,0 +1,1 @@
+stm50flw0x0x.o: stm50flw0x0x.c flash.h flashchips.h chipdrivers.h
