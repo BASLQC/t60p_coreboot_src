@@ -33,8 +33,7 @@ cd coreboot
 make clean
 rm -rf grub.elf grub_serial.elf
 
-# obtain a fresh copy of coreboot
-git pull origin master
+# obtain a fresh copy of all git submodules
 git submodule update --init --checkout
 cd ..
 
