@@ -23,6 +23,7 @@
  */
 
 #include "flash.h"
+#include "chipdrivers.h"
 
 #define MAX_REFLASH_TRIES 0x10
 #define MASK_FULL 0xffff
@@ -37,8 +38,7 @@ uint8_t oddparity(uint8_t val)
 	return (val ^ (val >> 1)) & 0x1;
 }
 
-static void toggle_ready_jedec_common(const struct flashctx *flash,
-				      chipaddr dst, int delay)
+static void toggle_ready_jedec_common(const struct flashctx *flash, chipaddr dst, unsigned int delay)
 {
 	unsigned int i = 0;
 	uint8_t tmp1, tmp2;
@@ -112,8 +112,7 @@ static unsigned int getaddrmask(const struct flashchip *chip)
 	}
 }
 
-static void start_program_jedec_common(struct flashctx *flash,
-				       unsigned int mask)
+static void start_program_jedec_common(const struct flashctx *flash, unsigned int mask)
 {
 	chipaddr bios = flash->virtual_memory;
 	chip_writeb(flash, 0xAA, bios + (0x5555 & mask));
@@ -128,7 +127,7 @@ static int probe_jedec_common(struct flashctx *flash, unsigned int mask)
 	uint8_t id1, id2;
 	uint32_t largeid1, largeid2;
 	uint32_t flashcontent1, flashcontent2;
-	int probe_timing_enter, probe_timing_exit;
+	unsigned int probe_timing_enter, probe_timing_exit;
 
 	if (chip->probe_timing > 0)
 		probe_timing_enter = probe_timing_exit = chip->probe_timing;
@@ -245,9 +244,9 @@ static int erase_sector_jedec_common(struct flashctx *flash, unsigned int page,
 				     unsigned int pagesize, unsigned int mask)
 {
 	chipaddr bios = flash->virtual_memory;
-	int delay_us = 0;
+	unsigned int delay_us = 0;
 	if(flash->chip->probe_timing != TIMING_ZERO)
-	        delay_us = 10;
+		delay_us = 10;
 
 	/*  Issue the Sector Erase command   */
 	chip_writeb(flash, 0xAA, bios + (0x5555 & mask));
@@ -275,9 +274,9 @@ static int erase_block_jedec_common(struct flashctx *flash, unsigned int block,
 				    unsigned int blocksize, unsigned int mask)
 {
 	chipaddr bios = flash->virtual_memory;
-	int delay_us = 0;
+	unsigned int delay_us = 0;
 	if(flash->chip->probe_timing != TIMING_ZERO)
-	        delay_us = 10;
+		delay_us = 10;
 
 	/*  Issue the Sector Erase command   */
 	chip_writeb(flash, 0xAA, bios + (0x5555 & mask));
@@ -304,9 +303,9 @@ static int erase_block_jedec_common(struct flashctx *flash, unsigned int block,
 static int erase_chip_jedec_common(struct flashctx *flash, unsigned int mask)
 {
 	chipaddr bios = flash->virtual_memory;
-	int delay_us = 0;
+	unsigned int delay_us = 0;
 	if(flash->chip->probe_timing != TIMING_ZERO)
-	        delay_us = 10;
+		delay_us = 10;
 
 	/*  Issue the JEDEC Chip Erase command   */
 	chip_writeb(flash, 0xAA, bios + (0x5555 & mask));
@@ -329,7 +328,7 @@ static int erase_chip_jedec_common(struct flashctx *flash, unsigned int mask)
 	return 0;
 }
 
-static int write_byte_program_jedec_common(struct flashctx *flash, uint8_t *src,
+static int write_byte_program_jedec_common(const struct flashctx *flash, const uint8_t *src,
 					   chipaddr dst, unsigned int mask)
 {
 	int tried = 0, failed = 0;
@@ -359,7 +358,7 @@ retry:
 }
 
 /* chunksize is 1 */
-int write_jedec_1(struct flashctx *flash, uint8_t *src, unsigned int start,
+int write_jedec_1(struct flashctx *flash, const uint8_t *src, unsigned int start,
 		  unsigned int len)
 {
 	int i, failed = 0;
@@ -381,11 +380,11 @@ int write_jedec_1(struct flashctx *flash, uint8_t *src, unsigned int start,
 	return failed;
 }
 
-static int write_page_write_jedec_common(struct flashctx *flash, uint8_t *src,
+static int write_page_write_jedec_common(struct flashctx *flash, const uint8_t *src,
 					 unsigned int start, unsigned int page_size)
 {
 	int i, tried = 0, failed;
-	uint8_t *s = src;
+	const uint8_t *s = src;
 	chipaddr bios = flash->virtual_memory;
 	chipaddr dst = bios + start;
 	chipaddr d = dst;
@@ -429,7 +428,7 @@ retry:
  * This function is a slightly modified copy of spi_write_chunked.
  * Each page is written separately in chunks with a maximum size of chunksize.
  */
-int write_jedec(struct flashctx *flash, uint8_t *buf, unsigned int start,
+int write_jedec(struct flashctx *flash, const uint8_t *buf, unsigned int start,
 		int unsigned len)
 {
 	unsigned int i, starthere, lenhere;

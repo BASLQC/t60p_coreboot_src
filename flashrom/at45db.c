@@ -215,17 +215,6 @@ int probe_spi_at45db(struct flashctx *flash)
 	return 1;
 }
 
-/* Returns the minimum number of bits needed to represent the given address.
- * FIXME: use mind-blowing implementation.
- * FIXME: move to utility module. */
-static uint32_t address_to_bits(uint32_t addr)
-{
-	unsigned int lzb = 0;
-	while (((1 << (31 - lzb)) & ~addr) != 0)
-		lzb++;
-	return 32 - lzb;
-}
-
 /* In case of non-power-of-two page sizes we need to convert the address flashrom uses to the address the
  * DataFlash chips use. The latter uses a segmented address space where the page address is encoded in the
  * more significant bits and the offset within the page is encoded in the less significant bits. The exact
@@ -254,14 +243,16 @@ int spi_read_at45db(struct flashctx *flash, uint8_t *buf, unsigned int addr, uns
 	 * chunks can cross page boundaries. */
 	const unsigned int max_data_read = flash->pgm->spi.max_data_read;
 	const unsigned int max_chunk = (max_data_read > 0) ? max_data_read : page_size;
-	while (addr < len) {
+	while (len > 0) {
 		unsigned int chunk = min(max_chunk, len);
-		int ret = spi_nbyte_read(flash, at45db_convert_addr(addr, page_size), buf + addr, chunk);
+		int ret = spi_nbyte_read(flash, at45db_convert_addr(addr, page_size), buf, chunk);
 		if (ret) {
 			msg_cerr("%s: error sending read command!\n", __func__);
 			return ret;
 		}
 		addr += chunk;
+		buf += chunk;
+		len -= chunk;
 	}
 
 	return 0;
@@ -283,7 +274,7 @@ int spi_read_at45db_e8(struct flashctx *flash, uint8_t *buf, unsigned int addr, 
 	 * chunks can cross page boundaries. */
 	const unsigned int max_data_read = flash->pgm->spi.max_data_read;
 	const unsigned int max_chunk = (max_data_read > 0) ? max_data_read : page_size;
-	while (addr < len) {
+	while (len > 0) {
 		const unsigned int addr_at45 = at45db_convert_addr(addr, page_size);
 		const unsigned char cmd[] = {
 			AT45DB_READ_ARRAY,
@@ -300,8 +291,10 @@ int spi_read_at45db_e8(struct flashctx *flash, uint8_t *buf, unsigned int addr, 
 			return ret;
 		}
 		/* Copy result without dummy bytes into buf and advance address counter respectively. */
-		memcpy(buf + addr, tmp + 4, chunk - 4);
+		memcpy(buf, tmp + 4, chunk - 4);
 		addr += chunk - 4;
+		buf += chunk - 4;
+		len -= chunk - 4;
 	}
 	return 0;
 }
@@ -460,7 +453,7 @@ int spi_erase_at45cs_sector(struct flashctx *flash, unsigned int addr, unsigned 
 	return at45db_erase(flash, opcode, at45db_convert_addr(addr, page_size), 200000, 100);
 }
 
-static int at45db_fill_buffer1(struct flashctx *flash, uint8_t *bytes, unsigned int off, unsigned int len)
+static int at45db_fill_buffer1(struct flashctx *flash, const uint8_t *bytes, unsigned int off, unsigned int len)
 {
 	const unsigned int page_size = flash->chip->page_size;
 	if ((off + len) > page_size) {
@@ -518,7 +511,7 @@ static int at45db_commit_buffer1(struct flashctx *flash, unsigned int at45db_add
 	return 0;
 }
 
-static int at45db_program_page(struct flashctx *flash, uint8_t *buf, unsigned int at45db_addr)
+static int at45db_program_page(struct flashctx *flash, const uint8_t *buf, unsigned int at45db_addr)
 {
 	int ret = at45db_fill_buffer1(flash, buf, 0, flash->chip->page_size);
 	if (ret != 0) {
@@ -535,7 +528,7 @@ static int at45db_program_page(struct flashctx *flash, uint8_t *buf, unsigned in
 	return 0;
 }
 
-int spi_write_at45db(struct flashctx *flash, uint8_t *buf, unsigned int start, unsigned int len)
+int spi_write_at45db(struct flashctx *flash, const uint8_t *buf, unsigned int start, unsigned int len)
 {
 	const unsigned int page_size = flash->chip->page_size;
 	const unsigned int total_size = flash->chip->total_size;

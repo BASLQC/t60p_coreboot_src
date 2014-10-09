@@ -89,6 +89,7 @@ int probe_82802ab(struct flashctx *flash)
 	return 1;
 }
 
+/* FIXME: needs timeout */
 uint8_t wait_82802ab(struct flashctx *flash)
 {
 	uint8_t status;
@@ -141,8 +142,7 @@ int erase_block_82802ab(struct flashctx *flash, unsigned int page,
 }
 
 /* chunksize is 1 */
-int write_82802ab(struct flashctx *flash, uint8_t *src, unsigned int start,
-		  unsigned int len)
+int write_82802ab(struct flashctx *flash, const uint8_t *src, unsigned int start, unsigned int len)
 {
 	int i;
 	chipaddr dst = flash->virtual_memory + start;

@@ -876,8 +876,7 @@ int spi_byte_program(struct flashctx *flash, unsigned int addr,
 	return result;
 }
 
-int spi_nbyte_program(struct flashctx *flash, unsigned int addr, uint8_t *bytes,
-		      unsigned int len)
+int spi_nbyte_program(struct flashctx *flash, unsigned int addr, const uint8_t *bytes, unsigned int len)
 {
 	int result;
 	/* FIXME: Switch to malloc based on len unless that kills speed. */
@@ -983,7 +982,7 @@ int spi_read_chunked(struct flashctx *flash, uint8_t *buf, unsigned int start,
  * FIXME: Use the chunk code from Michael Karcher instead.
  * Each page is written separately in chunks with a maximum size of chunksize.
  */
-int spi_write_chunked(struct flashctx *flash, uint8_t *buf, unsigned int start,
+int spi_write_chunked(struct flashctx *flash, const uint8_t *buf, unsigned int start,
 		      unsigned int len, unsigned int chunksize)
 {
 	int rc = 0;
@@ -1032,8 +1031,7 @@ int spi_write_chunked(struct flashctx *flash, uint8_t *buf, unsigned int start,
  * (e.g. due to size constraints in IT87* for over 512 kB)
  */
 /* real chunksize is 1, logical chunksize is 1 */
-int spi_chip_write_1(struct flashctx *flash, uint8_t *buf, unsigned int start,
-		     unsigned int len)
+int spi_chip_write_1(struct flashctx *flash, const uint8_t *buf, unsigned int start, unsigned int len)
 {
 	unsigned int i;
 	int result = 0;
@@ -1049,7 +1047,7 @@ int spi_chip_write_1(struct flashctx *flash, uint8_t *buf, unsigned int start,
 	return 0;
 }
 
-int default_spi_write_aai(struct flashctx *flash, uint8_t *buf, unsigned int start, unsigned int len)
+int default_spi_write_aai(struct flashctx *flash, const uint8_t *buf, unsigned int start, unsigned int len)
 {
 	uint32_t pos = start;
 	int result;
@@ -1128,13 +1126,9 @@ int default_spi_write_aai(struct flashctx *flash, uint8_t *buf, unsigned int sta
 
 
 	result = spi_send_multicommand(flash, cmds);
-	if (result) {
-		msg_cerr("%s failed during start command execution\n",
-			 __func__);
-		/* FIXME: Should we send WRDI here as well to make sure the chip
-		 * is not in AAI mode?
-		 */
-		return result;
+	if (result != 0) {
+		msg_cerr("%s failed during start command execution: %d\n", __func__, result);
+		goto bailout;
 	}
 	while (spi_read_status_register(flash) & SPI_SR_WIP)
 		programmer_delay(10);
@@ -1146,16 +1140,21 @@ int default_spi_write_aai(struct flashctx *flash, uint8_t *buf, unsigned int sta
 	while (pos < start + len - 1) {
 		cmd[1] = buf[pos++ - start];
 		cmd[2] = buf[pos++ - start];
-		spi_send_command(flash, JEDEC_AAI_WORD_PROGRAM_CONT_OUTSIZE, 0,
-				 cmd, NULL);
+		result = spi_send_command(flash, JEDEC_AAI_WORD_PROGRAM_CONT_OUTSIZE, 0, cmd, NULL);
+		if (result != 0) {
+			msg_cerr("%s failed during followup AAI command execution: %d\n", __func__, result);
+			goto bailout;
+		}
 		while (spi_read_status_register(flash) & SPI_SR_WIP)
 			programmer_delay(10);
 	}
 
-	/* Use WRDI to exit AAI mode. This needs to be done before issuing any
-	 * other non-AAI command.
-	 */
-	spi_write_disable(flash);
+	/* Use WRDI to exit AAI mode. This needs to be done before issuing any other non-AAI command. */
+	result = spi_write_disable(flash);
+	if (result != 0) {
+		msg_cerr("%s failed to disable AAI mode.\n", __func__);
+		return SPI_GENERIC_ERROR;
+	}
 
 	/* Write remaining byte (if any). */
 	if (pos < start + len) {
@@ -1165,4 +1164,10 @@ int default_spi_write_aai(struct flashctx *flash, uint8_t *buf, unsigned int sta
 	}
 
 	return 0;
+
+bailout:
+	result = spi_write_disable(flash);
+	if (result != 0)
+		msg_cerr("%s failed to disable AAI mode.\n", __func__);
+	return SPI_GENERIC_ERROR;
 }

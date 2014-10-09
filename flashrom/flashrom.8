@@ -1,4 +1,4 @@
-.TH FLASHROM 8 "Jul, 2013"
+.TH FLASHROM 8 "2014-07-22" "0.9.7-unknown"
 .SH NAME
 flashrom \- detect, read, write, verify and erase flash chips
 .SH SYNOPSIS
@@ -192,12 +192,16 @@ cards)"
 .sp
 .BR "* atahpt" " (for flash ROMs on Highpoint ATA/RAID controllers)"
 .sp
+.BR "* atavia" " (for flash ROMs on VIA VT6421A SATA controllers)"
+.sp
+.BR "* it8212" " (for flash ROMs on ITE IT8212F ATA/RAID controller)"
+.sp
 .BR "* ft2232_spi" " (for SPI flash ROMs attached to an FT2232/FT4232H/FT232H family \
 based USB SPI programmer), including the DLP Design DLP-USB1232H, \
 FTDI FT2232H Mini-Module, FTDI FT4232H Mini-Module, openbiosprog-spi, Amontec \
 JTAGkey/JTAGkey-tiny/JTAGkey-2, Dangerous Prototypes Bus Blaster, \
 Olimex ARM-USB-TINY/-H, Olimex ARM-USB-OCD/-H, TIAO/DIYGADGET USB
-Multi-Protocol Adapter (TUMPA), and GOEPEL PicoTAP.
+Multi-Protocol Adapter (TUMPA), TUMPA Lite, and GOEPEL PicoTAP.
 .sp
 .BR "* serprog" " (for flash ROMs attached to a programmer speaking serprog), \
 including AVR flasher by Urja Rannikko, AVR flasher by eightdot, \
@@ -208,8 +212,7 @@ atmegaXXu2-flasher by Stefan Tauner."
 .sp
 .BR "* dediprog" " (for SPI flash ROMs attached to a Dediprog SF100)"
 .sp
-.BR "* rayer_spi" " (for SPI flash ROMs attached to a RayeR parport "
-or Xilinx DLC5 compatible cable)
+.BR "* rayer_spi" " (for SPI flash ROMs attached to a parallel port by one of various cable types)"
 .sp
 .BR "* pony_spi" " (for SPI flash ROMs attached to a SI-Prog serial port "
 bitbanging adapter)
@@ -358,6 +361,27 @@ syntax. The user is responsible for supplying a suitable image or leaving out th
 a layout file. This limitation might be removed in the future when we understand the details better and have
 received enough feedback from users. Please report the outcome if you had to use this option to write a chip.
 .sp
+An optional
+.B spispeed
+parameter specifies the frequency of the SPI bus where applicable (i.e.\& SB600 or later with an SPI flash chip
+directly attached to the chipset).
+Syntax is
+.sp
+.B "  flashrom \-p internal:spispeed=frequency"
+.sp
+where
+.B frequency
+can be
+.BR "'16.5\ MHz'" ", " "'22\ MHz'" ", " "'33\ MHz'" ", " "'66\ MHz'" ", " "'100\ MHZ'" ", or " "'800\ kHz'" "."
+Support of individual frequencies depends on the generation of the chipset:
+.sp
+* SB6xx, SB7xx, SP5xxx: from 16.5 MHz up to and including 33 MHz
+.sp
+* SB8xx, SB9xx, Hudson: from 16.5 MHz up to and including 66 MHz
+.sp
+* Yangtze (with SPI 100 engine as found in Kabini and Tamesh): all of them
+.sp
+The default is to use 16.5 MHz and disable Fast Reads.
 .TP
 .B Intel chipsets
 .sp
@@ -397,7 +421,7 @@ syntax. If this leads to erase or write accesses to the flash it would most
 probably bring it into an inconsistent and unbootable state and we will not
 provide any support in such a case.
 .sp
-If you have an Intel chipset with an ICH6 or later southbridge and if you want
+If you have an Intel chipset with an ICH2 or later southbridge and if you want
 to set specific IDSEL values for a non-default flash chip or an embedded
 controller (EC), you can use the
 .sp
@@ -567,9 +591,9 @@ syntax where
 .B content
 is an 8-bit hexadecimal value.
 .SS
-.BR "nic3com" , " nicrealtek" , " nicnatsemi" , " nicintel\
-" , " nicintel_spi" , " gfxnvidia" , " ogp_spi" , " drkaiser" , " satasii\
-" , " satamv" ", and " atahpt " programmers
+.BR "nic3com" , " nicrealtek" , " nicnatsemi" , " nicintel"\
+, " nicintel_spi" , " gfxnvidia" , " ogp_spi" , " drkaiser" , " satasii"\
+, " satamv" , " atahpt" ", " atavia " and " it8212 " programmers
 These programmers have an option to specify the PCI address of the card
 your want to use, which must be specified if more than one card supported
 by the selected programmer is installed in your system. The syntax is
@@ -578,7 +602,7 @@ by the selected programmer is installed in your system. The syntax is
 .sp
 where
 .B xxxx
-is the name of the programmer
+is the name of the programmer,
 .B bb
 is the PCI bus number,
 .B dd
@@ -588,6 +612,18 @@ is the PCI function number of the desired device.
 .sp
 Example:
 .B "flashrom \-p nic3com:pci=05:04.0"
+.SS
+.BR "atavia " programmer
+Due to the mysterious address handling of the VIA VT6421A controller the user can specify an offset with the
+.sp
+.B "  flashrom \-p atavia:offset=addr"
+.sp
+syntax where
+.B addr
+will be interpreted as usual (leading 0x (0) for hexadecimal (octal) values, or else decimal).
+For more information please see
+.nh
+.B http://flashrom.org/VT6421A
 .SS
 .BR "ft2232_spi " programmer
 An optional parameter specifies the controller
@@ -600,7 +636,7 @@ syntax where
 can be
 .BR 2232H ", " 4232H ", " 232H ", " jtagkey ", " busblaster ", " openmoko ", " \
 arm-usb-tiny ", " arm-usb-tiny-h ", " arm-usb-ocd ", " arm-usb-ocd-h \
-", " tumpa ", or " picotap
+", " tumpa ", " tumpalite ", or " picotap
 and
 .B interface
 can be
@@ -760,15 +796,21 @@ parameter to specify the cable type with the
 syntax where
 .B model
 can be
-.BR rayer " for the RayeR cable or " xilinx " for the Xilinx Parallel Cable III
-(DLC 5).
+.BR rayer " for the RayeR cable, " byteblastermv " for the Altera ByteBlasterMV, " stk200 " for the Atmel \
+STK200/300, " wiggler " for the Macraigor Wiggler, or " xilinx " for the Xilinx Parallel Cable III (DLC 5)."
 .sp
 More information about the RayeR hardware is available at
 .nh
 .BR "http://rayer.ic.cz/elektro/spipgm.htm " .
-The schematic of the Xilinx DLC 5 was published at
+The Altera ByteBlasterMV datasheet can be obtained from
 .nh
-.BR "http://www.xilinx.com/itp/xilinx4/data/docs/pac/appendixb.html " .
+.BR "http://www.altera.co.jp/literature/ds/dsbytemv.pdf " .
+For more information about the Macraigor Wiggler see
+.nh
+.BR "http://www.macraigor.com/wiggler.htm " .
+The schematic of the Xilinx DLC 5 was published in
+.nh
+.BR "http://www.xilinx.com/support/documentation/user_guides/xtp029.pdf " .
 .SS
 .BR "pony_spi " programmer
 The serial port (like /dev/ttyS0, /dev/ttyUSB0 on Linux or COM3 on windows) is
@@ -857,8 +899,7 @@ backuplog.txt, writelog.txt and restorelog.txt. See section
 .B BUGS
 for contact info.
 .SH EXIT STATUS
-flashrom exits with 0 on success, 1 on most failures but with 2 if /dev/mem
-(/dev/xsvc on Solaris) can not be opened and with 3 if a call to mmap() fails.
+flashrom exits with 0 on success, 1 on most failures but with 3 if a call to mmap() fails.
 .SH REQUIREMENTS
 flashrom needs different access permissions for different programmers.
 .sp
@@ -866,13 +907,16 @@ flashrom needs different access permissions for different programmers.
 needs raw memory access, PCI configuration space access, raw I/O port
 access (x86) and MSR access (x86).
 .sp
+.B atavia
+needs PCI configuration space access.
+.sp
 .BR nic3com ", " nicrealtek " and " nicnatsemi "
 need PCI configuration space read access and raw I/O port access.
 .sp
 .B atahpt
 needs PCI configuration space access and raw I/O port access.
 .sp
-.BR gfxnvidia " and " drkaiser
+.BR gfxnvidia ", " drkaiser " and " it8212
 need PCI configuration space access and raw memory access.
 .sp
 .B rayer_spi
@@ -898,7 +942,7 @@ need access to the USB device via libusb.
 needs no access permissions at all.
 .sp
 .BR internal ", " nic3com ", " nicrealtek ", " nicnatsemi ", "
-.BR gfxnvidia ", " drkaiser ", " satasii ", " satamv " and " atahpt
+.BR gfxnvidia ", " drkaiser ", " satasii ", " satamv ", " atahpt" and " atavia
 have to be run as superuser/root, and need additional raw access permission.
 .sp
 .BR serprog ", " buspirate_spi ", " dediprog ", " usbblaster_spi " and " ft2232_spi

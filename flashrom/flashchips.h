@@ -129,7 +129,7 @@
 #define AMIC_A29L040		0x92
 #define AMIC_A49LF040A		0x9d
 
-#define ATMEL_ID		0x1F	/* Atmel */
+#define ATMEL_ID		0x1F	/* Atmel (now used by Adesto) */
 #define ATMEL_AT25DF021		0x4300
 #define ATMEL_AT25DF041A	0x4401
 #define ATMEL_AT25DF081		0x4502	/* EDI 0x00. AT25DL081 has same ID + EDI 0x0100 */
@@ -208,6 +208,7 @@
 
 #define ESMT_ID			0x8C	/* Elite Semiconductor Memory Technology (ESMT) / EFST Elite Flash Storage */
 #define ESMT_F25L008A		0x2014
+#define ESMT_F25L32PA		0x2016
 #define ESMT_F25D08QA		0x2534
 #define ESMT_F25L16QA2S		0x4015
 #define ESMT_F25L32QA		0x4016
@@ -423,22 +424,22 @@
 
 #define ISSI_ID			0xD5	/* ISSI Integrated Silicon Solutions */
 
-/*
- * MX25 chips are SPI, first byte of device ID is memory type,
+#define MACRONIX_ID		0xC2	/* Macronix (MX) */
+/* Mask ROMs */
+#define MACRONIX_MX23L3254	0x0516
+/* MX25 chips are SPI, first byte of device ID is memory type,
  * second byte of device ID is log(bitsize)-9.
  * Generalplus SPI chips seem to be compatible with Macronix
- * and use the same set of IDs.
- */
-#define MACRONIX_ID		0xC2	/* Macronix (MX) */
+ * and use the same set of IDs. */
 #define MACRONIX_MX25L512	0x2010	/* Same as MX25L512E, MX25V512, MX25V512C */
 #define MACRONIX_MX25L1005	0x2011	/* Same as MX25L1005C, MX25L1006E */
 #define MACRONIX_MX25L2005	0x2012	/* Same as MX25L2005C */
 #define MACRONIX_MX25L4005	0x2013	/* Same as MX25L4005A, MX25L4005C */
-#define MACRONIX_MX25L8005	0x2014	/* Same as MX25V8005 */
-#define MACRONIX_MX25L1605	0x2015	/* MX25L1605 (64k 0x20); MX25L1605A/MX25L1606E (4k 0x20, 64k 0x52); MX25L1605D/MX25L1608D (4k 0x20) */
-#define MACRONIX_MX25L3205	0x2016	/* MX25L3205, MX25L3205A (64k 0x20); MX25L3205D/MX25L3208D (4k 0x20); MX25L3206E (4k 0x20, 64k 0x52) */
-#define MACRONIX_MX25L6405	0x2017	/* MX25L6405, MX25L6405D (64k 0x20); MX25L6406E/MX25L6436E (4k 0x20); MX25L6445E (4k 0x20, 64k 0x52) */
-#define MACRONIX_MX25L12805	0x2018	/* Same as MX25L12805D */
+#define MACRONIX_MX25L8005	0x2014	/* Same as MX25V8005; FIXME: MX25L8073E (4k 0x20) */
+#define MACRONIX_MX25L1605	0x2015	/* MX25L1605 (64k 0x20); MX25L1605A/MX25L1606E (4k 0x20, 64k 0x52); MX25L1605D/MX25L1608D/MX25L1673E (4k 0x20) */
+#define MACRONIX_MX25L3205	0x2016	/* MX25L3205, MX25L3205A (64k 0x20); MX25L3205D/MX25L3208D (4k 0x20); MX25L3206E (4k 0x20, 64k 0x52); MX25L3273E (4k 0x20, 32k 0x52) */
+#define MACRONIX_MX25L6405	0x2017	/* MX25L6405, MX25L6405D (64k 0x20); MX25L6406E/MX25L6436E (4k 0x20); MX25L6445E/MX25L6473E (4k 0x20, 32k 0x52) */
+#define MACRONIX_MX25L12805	0x2018	/* Same as MX25L12805D, MX25L12835F, MX25L12845E (the latter two support completely new ID commands) */
 #define MACRONIX_MX25L25635F	0x2019	/* Same as MX25L25639F, but the latter seems to not support REMS */
 #define MACRONIX_MX25L1635D	0x2415
 #define MACRONIX_MX25L1635E	0x2515	/* MX25L1635{E} */
@@ -448,6 +449,7 @@
 #define MACRONIX_MX25U12835E	0x2538	/* Same as MX25U12835F */
 #define MACRONIX_MX25U25635F	0x2539
 #define MACRONIX_MX25L3235D	0x5E16	/* MX25L3225D/MX25L3235D/MX25L3237D */
+
 #define MACRONIX_MX29F001B	0x19
 #define MACRONIX_MX29F001T	0x18
 #define MACRONIX_MX29F002B	0x34	/* Same as MX29F002NB; N has reset pin n/c. */
@@ -501,7 +503,8 @@
 /*
  * Programmable Micro Corp is listed in JEP106W in bank 2, so it should
  * have a 0x7F continuation code prefix.
- * Apparently this name is owned by "Chingis Technology Corporation" http://www.chingistek.com.
+ * Apparently this name is owned by "Chingis Technology Corporation" http://www.chingistek.com which is now a
+ * subsidiary of ISSI. They continue to use the PMC manufacturer ID nevertheless.
  */
 #define PMC_ID			0x7F9D	/* PMC */
 #define PMC_ID_NOPREFIX		0x9D	/* PMC, missing 0x7F prefix */
@@ -531,11 +534,14 @@
  * second byte is the device code,
  * third byte is a dummy byte.
  */
-#define SANYO_ID		0x62
+#define SANYO_ID		0x62    /* Sanyo */
 #define SANYO_LE25FW203A	0x1600
 #define SANYO_LE25FW403A	0x1100
+#define SANYO_LE25FW106		0x15
 #define SANYO_LE25FW406		0x07	/* RES2 */
 #define SANYO_LE25FW418A	0x10	/* RES2 and some weird 1 byte RDID variant */
+#define SANYO_LE25FW406A	0x1A	/* RES2, no datasheet */
+#define SANYO_LE25FU406B	0x1E	/* LE25FW418A without HD_READ mode option variant */
 #define SANYO_LE25FW806		0x26	/* RES2 and some weird 1 byte RDID variant */
 #define SANYO_LE25FW808		0x20	/* RES2 and some weird 1 byte RDID variant */
 
@@ -565,18 +571,24 @@
 #define SPANSION_S25FL204	0x4013
 #define SPANSION_S25FL208	0x4014
 #define SPANSION_S25FL216	0x4015	/* Same as S25FL216K, but the latter supports OTP, 3 status regs, quad I/O, SFDP etc. */
+#define SPANSION_S25FL132K	0x4016
+#define SPANSION_S25FL164K	0x4017
+
 /*
  * SST25 chips are SPI, first byte of device ID is memory type, second
  * byte of device ID is related to log(bitsize) at least for some chips.
  */
 #define SST_ID			0xBF	/* SST */
+#define SST_SST25LF020_REMS	0x43	/* REMS or RES opcode */
 #define SST_SST25WF512		0x2501
 #define SST_SST25WF010		0x2502
 #define SST_SST25WF020		0x2503
 #define SST_SST25WF040		0x2504
+#define SST_SST25WF080		0x2505
 #define SST_SST25VF512A_REMS	0x48	/* REMS or RES opcode */
 #define SST_SST25VF010_REMS	0x49	/* REMS or RES opcode */
-#define SST_SST25VF020_REMS	0x43	/* REMS or RES opcode */
+#define SST_SST25VF020_REMS	0x43	/* REMS or RES opcode, same as SST25LF020A */
+#define SST_SST25VF020B		0x258C
 #define SST_SST25VF040_REMS	0x44	/* REMS or RES opcode, same as SST25LF040A */
 #define SST_SST25VF040B		0x258D
 #define SST_SST25VF040B_REMS	0x8D	/* REMS or RES opcode */
@@ -589,6 +601,7 @@
 #define SST_SST25VF064C		0x254B
 #define SST_SST26VF016		0x2601
 #define SST_SST26VF032		0x2602
+#define SST_SST26VF064B		0x2643
 #define SST_SST27SF512		0xA4
 #define SST_SST27SF010		0xA5
 #define SST_SST27SF020		0xA6
@@ -668,6 +681,7 @@
 #define ST_M50FW040		0x2C
 #define ST_M50FW080		0x2D
 #define ST_M50FW016		0x2E
+#define ST_M50LPW080		0x2F
 #define ST_M50LPW116		0x30
 #define ST_M29F002B		0x34	/* Same as M29F002BB */
 #define ST_M29F002T		0xB0	/* Same as M29F002BT/M29F002NT/M29F002BNT */

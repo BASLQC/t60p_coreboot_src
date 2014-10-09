@@ -1,1 +1,1 @@
-physmap.o: physmap.c flash.h hwaccess.h
+physmap.o: physmap.c flash.h programmer.h hwaccess.h

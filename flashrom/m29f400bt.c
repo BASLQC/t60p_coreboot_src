@@ -28,8 +28,7 @@
    functions. */
 
 /* chunksize is 1 */
-int write_m29f400bt(struct flashctx *flash, uint8_t *src, unsigned int start,
-		    unsigned int len)
+int write_m29f400bt(struct flashctx *flash, const uint8_t *src, unsigned int start, unsigned int len)
 {
 	int i;
 	chipaddr bios = flash->virtual_memory;
@@ -85,55 +84,4 @@ int probe_m29f400bt(struct flashctx *flash)
 		return 1;
 
 	return 0;
-}
-
-int erase_m29f400bt(struct flashctx *flash)
-{
-	chipaddr bios = flash->virtual_memory;
-
-	chip_writeb(flash, 0xAA, bios + 0xAAA);
-	chip_writeb(flash, 0x55, bios + 0x555);
-	chip_writeb(flash, 0x80, bios + 0xAAA);
-
-	chip_writeb(flash, 0xAA, bios + 0xAAA);
-	chip_writeb(flash, 0x55, bios + 0x555);
-	chip_writeb(flash, 0x10, bios + 0xAAA);
-
-	programmer_delay(10);
-	toggle_ready_jedec(flash, bios);
-
-	/* FIXME: Check the status register for errors. */
-	return 0;
-}
-
-int block_erase_m29f400bt(struct flashctx *flash, unsigned int start,
-			  unsigned int len)
-{
-	chipaddr bios = flash->virtual_memory;
-	chipaddr dst = bios + start;
-
-	chip_writeb(flash, 0xAA, bios + 0xAAA);
-	chip_writeb(flash, 0x55, bios + 0x555);
-	chip_writeb(flash, 0x80, bios + 0xAAA);
-
-	chip_writeb(flash, 0xAA, bios + 0xAAA);
-	chip_writeb(flash, 0x55, bios + 0x555);
-	chip_writeb(flash, 0x30, dst);
-
-	programmer_delay(10);
-	toggle_ready_jedec(flash, bios);
-
-	/* FIXME: Check the status register for errors. */
-	return 0;
-}
-
-int block_erase_chip_m29f400bt(struct flashctx *flash, unsigned int address,
-			       unsigned int blocklen)
-{
-	if ((address != 0) || (blocklen != flash->chip->total_size * 1024)) {
-		msg_cerr("%s called with incorrect arguments\n",
-			__func__);
-		return -1;
-	}
-	return erase_m29f400bt(flash);
 }

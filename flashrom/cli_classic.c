@@ -221,8 +221,6 @@ int main(int argc, char *argv[])
 				free(tempstr);
 				cli_classic_abort_usage();
 			}
-			/* FIXME: A pointer to the image name is saved in a static array (of size MAX_ROMLAYOUT)
-			 * by register_include_arg() and needs to be freed after processing them. */
 			break;
 		case 'L':
 			if (++operation_specified > 1) {
@@ -340,8 +338,7 @@ int main(int argc, char *argv[])
 	if (logfile && check_filename(logfile, "log"))
 		cli_classic_abort_usage();
 	if (logfile && open_logfile(logfile))
-		return 1;
-	free(logfile);
+		cli_classic_abort_usage();
 #endif /* !STANDALONE */
 
 #if CONFIG_PRINT_WIKI == 1
@@ -372,6 +369,12 @@ int main(int argc, char *argv[])
 		ret = 1;
 		goto out;
 	}
+	if (layoutfile != NULL && !write_it) {
+		msg_gerr("Layout files are currently supported for write operations only.\n");
+		ret = 1;
+		goto out;
+	}
+
 	if (process_include_args()) {
 		ret = 1;
 		goto out;
@@ -393,8 +396,10 @@ int main(int argc, char *argv[])
 	if (prog == PROGRAMMER_INVALID) {
 		if (CONFIG_DEFAULT_PROGRAMMER != PROGRAMMER_INVALID) {
 			prog = CONFIG_DEFAULT_PROGRAMMER;
-			msg_pinfo("Using default programmer \"%s\".\n",
-				  programmer_table[CONFIG_DEFAULT_PROGRAMMER].name);
+			/* We need to strdup here because we free(pparam) unconditionally later. */
+			pparam = strdup(CONFIG_DEFAULT_PROGRAMMER_ARGS);
+			msg_pinfo("Using default programmer \"%s\" with arguments \"%s\".\n",
+				  programmer_table[CONFIG_DEFAULT_PROGRAMMER].name, pparam);
 		} else {
 			msg_perr("Please select a programmer with the --programmer parameter.\n"
 				 "Previously this was not necessary because there was a default set.\n"
@@ -518,8 +523,6 @@ int main(int argc, char *argv[])
 	 */
 	programmer_delay(100000);
 	ret |= doit(fill_flash, force, filename, read_it, write_it, erase_it, verify_it);
-	/* Note: doit() already calls programmer_shutdown(). */
-	goto out;
 
 out_shutdown:
 	programmer_shutdown();
@@ -527,6 +530,7 @@ out:
 	for (i = 0; i < chipcount; i++)
 		free(flashes[i].chip);
 
+	layout_cleanup();
 	free(filename);
 	free(layoutfile);
 	free(pparam);
@@ -534,6 +538,7 @@ out:
 	free((char *)chip_to_probe); /* Silence! Freeing is not modifying contents. */
 	chip_to_probe = NULL;
 #ifndef STANDALONE
+	free(logfile);
 	ret |= close_logfile();
 #endif /* !STANDALONE */
 	return ret;

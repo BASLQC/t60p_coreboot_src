@@ -1,12 +1,74 @@
 #!/bin/bash
 
-# note: I have to put steps here to compile all pre-requesites from scratch too.
-# but this works for me. just have to make it more generic
+echo "  *********************************************************************
+        ThinkPad T60p Coreboot build script - For SeaBIOS and GRUB2 Payloads
+        Derived from Libreboot build scripts created by the Gluglug.
+        Script modified by BASLQC Antonizoon <sagnessagiel at gmail dot com>
+        *********************************************************************"
+
+# Check for `resources/t60p/` folder
+if [ ! -d "resource/t60p" ]; then
+    echo 'The `./resources/t60p/` folder does not exist, aborting.'
+    exit
+fi
+
+# Check for `resources/flashrom/` folder
+if [ ! -d "resource/t60p" ]; then
+    echo 'The `./resources/flashrom/` folder does not exist, so Flashrom will not be patched.'
+fi
+
+# Check for vgabios.bin file
+if [[ ! -f "resources/t60p/vgabios.bin" ]] ; then
+    echo 'The "vgabios.bin" file is not in ./resources/t60p/, aborting.'
+    echo ""
+    echo 'Please extract your "vgabios.bin" file using the following command:'
+    echo """cat /proc/iomem | grep 'Video ROM' | (read m; m=\${m/ :*}; s=\${m/-*}; e=\${m/*-}; \\
+dd if=/dev/mem of=vgabios.bin bs=1c skip=\$[0x\$s] count=\$[\$[0x\$e]-\$[0x\$s]+1])"""
+    echo 'Then insert it into the folder "resources/t60p/".'
+    exit
+fi
 
 # run "make clean" in coreboot
 cd coreboot
 make clean
 rm -rf grub.elf grub_serial.elf
+
+# obtain a fresh copy of coreboot
+git pull origin master
+git submodule update --init --checkout
+cd ..
+
+# Set up VGABIOS:
+# ----------------------------------------------------------------------------------------------------------------------
+
+cd coreboot
+
+# copy `vgabios.bin` to coreboot folder
+cp ../resources/t60p/vgabios.bin .
+
+echo "Please enter the machine's unique VGABIOS Vendor and Device ID when prompted."
+echo "    DO NOT USE ANOTHER MACHINE'S VGABIOS ID."
+echo "To find the VGABIOS Vendor and Device ID, use the following command: "
+echo "    romheaders vgabios.bin"
+echo "The 'romheaders' program is bundled with the FCode Suite: "
+echo "    http://www.openfirmware.info/FCODE_suite"
+echo ""
+
+# prompt user for VGA_BIOS_ID
+echo -n "Type the VGABIOS Vendor ID (e.g. 1002) and press [ENTER]: "
+read vgabios_vendor_id
+echo "    The Vendor ID entered is '$vgabios_vendor_id'. Press Ctrl-C if this is incorrect."
+echo -n "Type the VGABIOS Device ID (e.g. 71c4) and press [ENTER]: "
+read vgabios_device_id
+echo "    The Device ID entered is '$vgabios_device_id'."
+echo "The full VGABIOS ID will be ($vgabios_vendor_id,$vgabios_device_id). Press Ctrl-C if this is incorrect."
+read
+
+# insert VGA_BIOS_ID into t60 coreboot config files
+sed -i.bak sed "s/^\(CONFIG_VGA_BIOS_ID=\).*/\1\"$vgabios_vendor_id,$vgabios_device_id\"/" resources/t60p_coreboot.cfg
+sed -i.bak sed "s/^\(CONFIG_VGA_BIOS_ID=\).*/\1\"$vgabios_vendor_id,$vgabios_device_id\"/" resources/t60p_coreboot_serial.cfg
+sed -i.bak sed "s/^\(CONFIG_VGA_BIOS_ID=\).*/\1\"$vgabios_vendor_id,$vgabios_device_id\"/" resources/t60p_coreboot_seabios.cfg
+
 cd ..
 
 # Build the GRUB payloads (ELF executables):
@@ -26,33 +88,45 @@ mv grub.elf ../coreboot
 # ----------------------------------------------------------------------------------------------------------------------
 
 cd ../coreboot
+# prepare coreboot and build it (GRUB2: fast boot, without debugging):
 rm -rf .config
-# ThinkPad X60: prepare coreboot and build it (fast boot, without debugging):
-cp ../resources/libreboot/config/x60config_fastboot .config
+cp ../resources/t60p/t60p_coreboot.cfg .config
 make
 cp build/coreboot.rom .
 make clean
-# ThinkPad X60: prepare coreboot and build it (with debugging enabled):
+# prepare coreboot and build it (GRUB2: with debugging enabled):
 rm -rf .config
-cp ../resources/libreboot/config/x60config_debug .config
+cp ../resources/t60p/t60p_coreboot_serial.cfg .config
 make
 cp build/coreboot.rom coreboot_serial.rom
 make clean
+# prepare coreboot and build it (SeaBIOS Payload):
+rm -rf .config
+cp ../resources/t60p/t60p_coreboot_seabios.cfg .config
+make
+cp build/coreboot.rom coreboot_seabios.rom
+make clean
 
-# ThinkPad X60: prepare the ROM's that will have alternative (dvorak) configs inserted 
+# prepare the ROM's that will have alternative (dvorak) configs inserted 
 cp coreboot.rom coreboot_dvorak.rom
 cp coreboot_serial.rom coreboot_serial_dvorak.rom
-# ThinkPad X60: prepare the ROM's that will have alternative (uk dvorak) configs inserted
+# prepare the ROM's that will have alternative (uk dvorak) configs inserted
 cp coreboot.rom coreboot_ukdvorak.rom
 cp coreboot_serial.rom coreboot_serial_ukdvorak.rom
-# ThinkPad X60: prepare the ROM's that will have alternative (uk qwerty) configs inserted
+# prepare the ROM's that will have alternative (uk qwerty) configs inserted
 cp coreboot.rom coreboot_ukqwerty.rom
 cp coreboot_serial.rom coreboot_serial_ukqwerty.rom
 
 # Insert additional configs and other files into the ROM's:
 # ---------------------------------------------------------------------------------------------------------------------
 
-# ThinkPad X60: prepare finished coreboot.rom
+# prepare finished coreboot_seabios.rom
+# Configuration: SeaBIOS, supports any keyboard layout.
+dd if=coreboot_seabios.rom of=top64k.bin bs=1 skip=$[$(stat -c %s coreboot_seabios.rom) - 0x10000] count=64k
+dd if=coreboot_seabios.rom bs=1 skip=$[$(stat -c %s coreboot_seabios.rom) - 0x20000] count=64k | hexdump
+dd if=top64k.bin of=coreboot_seabios.rom bs=1 seek=$[$(stat -c %s coreboot_seabios.rom) - 0x20000] count=64k conv=notrunc
+
+# prepare finished coreboot.rom
 # Configuration: US Qwerty keyboard layout in GRUB payload. No MemTest86+. No serial output. (for those without dock).
 mv coreboot.rom util/cbfstool
 cp ../resources/grub/config/grub.cfg util/cbfstool
@@ -72,7 +146,7 @@ rm -rf background.png
 rm -rf dejavusansmono.pf2
 cd ../../
 
-# ThinkPad X60: prepare finished coreboot_dvorak.rom
+# prepare finished coreboot_dvorak.rom
 # Configuration: US Dvorak keyboard layout in GRUB payload. No MemTest86+. No serial output. (for those without dock)
 mv coreboot_dvorak.rom util/cbfstool/coreboot.rom
 cp ../resources/grub/config/grub_dvorak.cfg util/cbfstool/grub.cfg
@@ -92,7 +166,7 @@ rm -rf background.png
 rm -rf dejavusansmono.pf2
 cd ../../
 
-# ThinkPad X60: prepare finished coreboot_ukdvorak.rom
+# prepare finished coreboot_ukdvorak.rom
 # Configuration: UK Dvorak keyboard layout in GRUB payload. No MemTest86+. No serial output. (for those without dock)
 mv coreboot_ukdvorak.rom util/cbfstool/coreboot.rom
 cp ../resources/grub/config/grub_ukdvorak.cfg util/cbfstool/grub.cfg
@@ -112,7 +186,7 @@ rm -rf background.png
 rm -rf dejavusansmono.pf2
 cd ../../
 
-# ThinkPad X60: prepare finished coreboot_ukqwerty.rom
+# prepare finished coreboot_ukqwerty.rom
 # Configuration: UK Qwerty keyboard layout in GRUB payload. No MemTest86+. No serial output. (for those without dock)
 mv coreboot_ukqwerty.rom util/cbfstool/coreboot.rom
 cp ../resources/grub/config/grub_ukqwerty.cfg util/cbfstool/grub.cfg
@@ -132,7 +206,7 @@ rm -rf background.png
 rm -rf dejavusansmono.pf2
 cd ../../
 
-# ThinkPad X60: prepare a finished coreboot_serial.rom
+# prepare a finished coreboot_serial.rom
 # Configuration: US Qwerty keyboard layout in GRUB payload. MemTest86+ included. Serial output enabled. (for those with dock).
 mv coreboot_serial.rom util/cbfstool/coreboot.rom
 cp ../resources/grub/config/grub_serial.cfg util/cbfstool/grub.cfg
@@ -155,7 +229,7 @@ rm -rf background.png
 rm -rf dejavusansmono.pf2
 cd ../../
 
-# ThinkPad X60: prepare a finished coreboot_serial_dvorak.rom
+# prepare a finished coreboot_serial_dvorak.rom
 # Configuration: US Dvorak keyboard layout in GRUB payload. MemTest86+ included. Serial output enabled. (for those with dock)
 mv coreboot_serial_dvorak.rom util/cbfstool/coreboot.rom
 cp ../resources/grub/config/grub_serial_dvorak.cfg util/cbfstool/grub.cfg
@@ -178,7 +252,7 @@ rm -rf background.png
 rm -rf dejavusansmono.pf2
 cd ../../
 
-# ThinkPad X60: prepare a finished coreboot_serial_ukdvorak.rom
+# prepare a finished coreboot_serial_ukdvorak.rom
 # Configuration: UK Dvorak keyboard layout in GRUB payload. MemTest86+ included. Serial output enabled. (for those with dock)
 mv coreboot_serial_ukdvorak.rom util/cbfstool/coreboot.rom
 cp ../resources/grub/config/grub_serial_ukdvorak.cfg util/cbfstool/grub.cfg
@@ -201,7 +275,7 @@ rm -rf background.png
 rm -rf dejavusansmono.pf2
 cd ../../
 
-# ThinkPad X60: prepare a finished coreboot_serial_ukqwerty.rom
+# prepare a finished coreboot_serial_ukqwerty.rom
 # Configuration: UK Qwerty keyboard layout in GRUB payload. MemTest86+ included. Serial output enabled. (for those with dock)
 mv coreboot_serial_ukqwerty.rom util/cbfstool/coreboot.rom
 cp ../resources/grub/config/grub_serial_ukqwerty.cfg util/cbfstool/grub.cfg
@@ -229,41 +303,50 @@ cd ../../
 
 # now we are back in the main coreboot directory
 
-# ThinkPad X60 ROM's:
+# ThinkPad T60p ROM's:
 
 # delete the old roms
-rm -rf ../bin/x60
+rm -rf ../bin/t60p
 # recreate directory
-mkdir ../bin/x60
+mkdir ../bin/t60p
 # now put the new roms in ./bin
-mv coreboot.rom ../bin/x60
-mv coreboot_serial.rom ../bin/x60
-mv coreboot_dvorak.rom ../bin/x60
-mv coreboot_serial_dvorak.rom ../bin/x60
-mv coreboot_ukdvorak.rom ../bin/x60
-mv coreboot_serial_ukdvorak.rom ../bin/x60
-mv coreboot_ukqwerty.rom ../bin/x60
-mv coreboot_serial_ukqwerty.rom ../bin/x60
+mv coreboot.rom ../bin/t60p
+mv coreboot_seabios.rom ../bin/t60p
+mv coreboot_serial.rom ../bin/t60p
+mv coreboot_dvorak.rom ../bin/t60p
+mv coreboot_serial_dvorak.rom ../bin/t60p
+mv coreboot_ukdvorak.rom ../bin/t60p
+mv coreboot_serial_ukdvorak.rom ../bin/t60p
+mv coreboot_ukqwerty.rom ../bin/t60p
+mv coreboot_serial_ukqwerty.rom ../bin/t60p
 
 # go back to main source directory
 cd ../
 
-# now prepare the libreboot_bin directory
+# now prepare the t60p_coreboot_bin directory
 
-rm -rf ../libreboot_bin
-mkdir ../libreboot_bin
-cp -r bin ../libreboot_bin
-cp COPYING ../libreboot_bin
-cp -r bucts ../libreboot_bin
-cp -r coreboot/util/cbfstool ../libreboot_bin
-cp DEBLOB ../libreboot_bin
-cp -r flashrom ../libreboot_bin
-cp README ../libreboot_bin
-cp -r docs ../libreboot_bin
-cp RELEASE ../libreboot_bin
-cp BACKPORT ../libreboot_bin
-cp powertop.trisquel6 ../libreboot_bin
-cp powertop.trisquel6.init ../libreboot_bin
+rm -rf ../t60p_coreboot_bin
+mkdir ../t60p_coreboot_bin
+cp -r bin ../t60p_coreboot_bin
+cp COPYING ../t60p_coreboot_bin
+cp -r bucts ../t60p_coreboot_bin
+cp -r coreboot/util/cbfstool ../t60p_coreboot_bin
+cp DEBLOB ../t60p_coreboot_bin
+cp README ../t60p_coreboot_bin
+cp -r docs ../t60p_coreboot_bin
+cp RELEASE ../t60p_coreboot_bin
+cp BACKPORT ../t60p_coreboot_bin
+cp powertop.trisquel6 ../t60p_coreboot_bin
+cp powertop.trisquel6.init ../t60p_coreboot_bin
 
-# done. now just tar up libreboot_src and libreboot_bin and upload them!!
+# copy flashrom and flasher tools
+
+cp -r flashrom ../t60p_coreboot_bin
+cp flash ../t60p_coreboot_bin
+cp lenovobios_firstflash ../t60p_coreboot_bin
+cp lenovobios_secondflash ../t60p_coreboot_bin
+cp builddeb-flashrom ../t60p_coreboot_bin
+cp builddeps-flashrom ../t60p_coreboot_bin
+
+# done. now just tar up t60p_coreboot_src and t60p_coreboot_bin and upload them!!
 # and tell everyone about it.

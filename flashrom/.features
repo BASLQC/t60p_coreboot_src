@@ -1,5 +1,5 @@
 FEATURES := yes
 FTDISUPPORT := yes
-FT232H := no
+FT232H := yes
 LINUX_SPI_SUPPORT := yes
 UTSNAME := yes

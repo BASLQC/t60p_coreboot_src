@@ -45,10 +45,18 @@
 typedef uintptr_t chipaddr;
 #define PRIxPTR_WIDTH ((int)(sizeof(uintptr_t)*2))
 
+/* Types and macros regarding the maximum flash space size supported by generic code. */
+typedef uint32_t chipoff_t; /* Able to store any addressable offset within a supported flash memory. */
+typedef uint32_t chipsize_t; /* Able to store the number of bytes of any supported flash memory. */
+#define FL_MAX_CHIPADDR_BITS (24)
+#define FL_MAX_CHIPADDR ((chipoff_t)(1ULL<<FL_MAX_CHIPADDR_BITS)-1)
+#define PRIxCHIPADDR "06"PRIx32
+#define PRIuCHIPSIZE PRIu32
+
 int register_shutdown(int (*function) (void *data), void *data);
 void *programmer_map_flash_region(const char *descr, uintptr_t phys_addr, size_t len);
 void programmer_unmap_flash_region(void *virt_addr, size_t len);
-void programmer_delay(int usecs);
+void programmer_delay(unsigned int usecs);
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -79,6 +87,7 @@ enum write_granularity {
 	write_gran_528bytes,	/* If less than 528 bytes are written, the unwritten bytes are undefined. */
 	write_gran_1024bytes,	/* If less than 1024 bytes are written, the unwritten bytes are undefined. */
 	write_gran_1056bytes,	/* If less than 1056 bytes are written, the unwritten bytes are undefined. */
+	write_gran_1byte_implicit_erase, /* EEPROMs and other chips with implicit erase and 1-byte writes. */
 };
 
 /*
@@ -112,6 +121,26 @@ enum write_granularity {
 #define FEATURE_OTP		(1 << 8)
 #define FEATURE_QPI		(1 << 9)
 
+enum test_state {
+	OK = 0,
+	NT = 1,	/* Not tested */
+	BAD,	/* Known to not work */
+	DEP,	/* Support depends on configuration (e.g. Intel flash descriptor) */
+	NA,	/* Not applicable (e.g. write support on ROM chips) */
+};
+
+#define TEST_UNTESTED	(struct tested){ .probe = NT, .read = NT, .erase = NT, .write = NT }
+
+#define TEST_OK_PROBE	(struct tested){ .probe = OK, .read = NT, .erase = NT, .write = NT }
+#define TEST_OK_PR	(struct tested){ .probe = OK, .read = OK, .erase = NT, .write = NT }
+#define TEST_OK_PRE	(struct tested){ .probe = OK, .read = OK, .erase = OK, .write = NT }
+#define TEST_OK_PREW	(struct tested){ .probe = OK, .read = OK, .erase = OK, .write = OK }
+
+#define TEST_BAD_PROBE	(struct tested){ .probe = BAD, .read = NT, .erase = NT, .write = NT }
+#define TEST_BAD_PR	(struct tested){ .probe = BAD, .read = BAD, .erase = NT, .write = NT }
+#define TEST_BAD_PRE	(struct tested){ .probe = BAD, .read = BAD, .erase = BAD, .write = NT }
+#define TEST_BAD_PREW	(struct tested){ .probe = BAD, .read = BAD, .erase = BAD, .write = BAD }
+
 struct flashctx;
 typedef int (erasefunc_t)(struct flashctx *flash, unsigned int addr, unsigned int blocklen);
 
@@ -135,11 +164,13 @@ struct flashchip {
 	unsigned int page_size;
 	int feature_bits;
 
-	/*
-	 * Indicate if flashrom has been tested with this flash chip and if
-	 * everything worked correctly.
-	 */
-	uint32_t tested;
+	/* Indicate how well flashrom supports different operations of this flash chip. */
+	struct tested {
+		enum test_state probe;
+		enum test_state read;
+		enum test_state erase;
+		enum test_state write;
+	} tested;
 
 	int (*probe) (struct flashctx *flash);
 
@@ -167,7 +198,7 @@ struct flashchip {
 
 	int (*printlock) (struct flashctx *flash);
 	int (*unlock) (struct flashctx *flash);
-	int (*write) (struct flashctx *flash, uint8_t *buf, unsigned int start, unsigned int len);
+	int (*write) (struct flashctx *flash, const uint8_t *buf, unsigned int start, unsigned int len);
 	int (*read) (struct flashctx *flash, uint8_t *buf, unsigned int start, unsigned int len);
 	struct voltage {
 		uint16_t min;
@@ -184,26 +215,6 @@ struct flashctx {
 	struct registered_programmer *pgm;
 };
 
-#define TEST_UNTESTED	0
-
-#define TEST_OK_PROBE	(1 << 0)
-#define TEST_OK_READ	(1 << 1)
-#define TEST_OK_ERASE	(1 << 2)
-#define TEST_OK_WRITE	(1 << 3)
-#define TEST_OK_PR	(TEST_OK_PROBE | TEST_OK_READ)
-#define TEST_OK_PRE	(TEST_OK_PROBE | TEST_OK_READ | TEST_OK_ERASE)
-#define TEST_OK_PRW	(TEST_OK_PROBE | TEST_OK_READ | TEST_OK_WRITE)
-#define TEST_OK_PREW	(TEST_OK_PROBE | TEST_OK_READ | TEST_OK_ERASE | TEST_OK_WRITE)
-#define TEST_OK_MASK	0x0f
-
-#define TEST_BAD_PROBE	(1 << 4)
-#define TEST_BAD_READ	(1 << 5)
-#define TEST_BAD_ERASE	(1 << 6)
-#define TEST_BAD_WRITE	(1 << 7)
-#define TEST_BAD_REW	(TEST_BAD_READ | TEST_BAD_ERASE | TEST_BAD_WRITE)
-#define TEST_BAD_PREW	(TEST_BAD_PROBE | TEST_BAD_READ | TEST_BAD_ERASE | TEST_BAD_WRITE)
-#define TEST_BAD_MASK	0xf0
-
 /* Timing used in probe routines. ZERO is -2 to differentiate between an unset
  * field and zero delay.
  * 
@@ -215,11 +226,12 @@ struct flashctx {
 #define TIMING_ZERO	-2
 
 extern const struct flashchip flashchips[];
+extern const unsigned int flashchips_size;
 
 void chip_writeb(const struct flashctx *flash, uint8_t val, chipaddr addr);
 void chip_writew(const struct flashctx *flash, uint16_t val, chipaddr addr);
 void chip_writel(const struct flashctx *flash, uint32_t val, chipaddr addr);
-void chip_writen(const struct flashctx *flash, uint8_t *buf, chipaddr addr, size_t len);
+void chip_writen(const struct flashctx *flash, const uint8_t *buf, chipaddr addr, size_t len);
 uint8_t chip_readb(const struct flashctx *flash, const chipaddr addr);
 uint16_t chip_readw(const struct flashctx *flash, const chipaddr addr);
 uint32_t chip_readl(const struct flashctx *flash, const chipaddr addr);
@@ -229,6 +241,14 @@ void chip_readn(const struct flashctx *flash, uint8_t *buf, const chipaddr addr,
 char *flashbuses_to_text(enum chipbustype bustype);
 int print_supported(void);
 void print_supported_wiki(void);
+
+/* helpers.c */
+uint32_t address_to_bits(uint32_t addr);
+int bitcount(unsigned long a);
+int max(int a, int b);
+int min(int a, int b);
+char *strcat_realloc(char *dest, const char *src);
+void tolower_string(char *str);
 
 /* flashrom.c */
 extern int verbose_screen;
@@ -240,13 +260,9 @@ int read_memmapped(struct flashctx *flash, uint8_t *buf, unsigned int start, uns
 int erase_flash(struct flashctx *flash);
 int probe_flash(struct registered_programmer *pgm, int startchip, struct flashctx *fill_flash, int force);
 int read_flash_to_file(struct flashctx *flash, const char *filename);
-int min(int a, int b);
-int max(int a, int b);
-void tolower_string(char *str);
 char *extract_param(const char *const *haystack, const char *needle, const char *delim);
-int verify_range(struct flashctx *flash, uint8_t *cmpbuf, unsigned int start, unsigned int len);
-int need_erase(uint8_t *have, uint8_t *want, unsigned int len, enum write_granularity gran);
-char *strcat_realloc(char *dest, const char *src);
+int verify_range(struct flashctx *flash, const uint8_t *cmpbuf, unsigned int start, unsigned int len);
+int need_erase(const uint8_t *have, const uint8_t *want, unsigned int len, enum write_granularity gran);
 void print_version(void);
 void print_buildinfo(void);
 void print_banner(void);
@@ -254,13 +270,7 @@ void list_programmers_linebreak(int startcol, int cols, int paren);
 int selfcheck(void);
 int doit(struct flashctx *flash, int force, const char *filename, int read_it, int write_it, int erase_it, int verify_it);
 int read_buf_from_file(unsigned char *buf, unsigned long size, const char *filename);
-int write_buf_to_file(unsigned char *buf, unsigned long size, const char *filename);
-
-enum test_state {
-	OK = 0,
-	NT = 1,	/* Not tested */
-	BAD
-};
+int write_buf_to_file(const unsigned char *buf, unsigned long size, const char *filename);
 
 /* Something happened that shouldn't happen, but we can go on. */
 #define ERROR_NONFATAL 0x100
@@ -318,8 +328,10 @@ __attribute__((format(printf, 2, 3)));
 /* layout.c */
 int register_include_arg(char *name);
 int process_include_args(void);
-int read_romlayout(char *name);
-int handle_romentries(const struct flashctx *flash, uint8_t *oldcontents, uint8_t *newcontents);
+int read_romlayout(const char *name);
+int normalize_romentries(const struct flashctx *flash);
+int build_new_image(const struct flashctx *flash, uint8_t *oldcontents, uint8_t *newcontents);
+void layout_cleanup(void);
 
 /* spi.c */
 struct spi_command {

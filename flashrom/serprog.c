@@ -100,6 +100,7 @@ static int sp_opensocket(char *ip, unsigned int port)
 	if (NULL == hostPtr) {
 		hostPtr = gethostbyaddr(ip, strlen(ip), AF_INET);
 		if (NULL == hostPtr) {
+			close(sock);
 			msg_perr("Error: cannot resolve %s\n", ip);
 			return -1;
 		}
@@ -114,7 +115,11 @@ static int sp_opensocket(char *ip, unsigned int port)
 	}
 	/* We are latency limited, and sometimes do write-write-read    *
 	 * (write-n) - so enable TCP_NODELAY.				*/
-	setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int));
+	if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int))) {
+		close(sock);
+		msg_perr("Error: serprog cannot set socket options: %s\n", strerror(errno));
+		return -1;
+	}
 	return sock;
 }
 #endif
@@ -865,7 +870,7 @@ static void serprog_chip_readn(const struct flashctx *flash, uint8_t * buf,
 		sp_do_read_n(&(buf[addrm-addr]), addrm, lenm); // FIXME: return error
 }
 
-void serprog_delay(int usecs)
+void serprog_delay(unsigned int usecs)
 {
 	unsigned char buf[4];
 	msg_pspew("%s usecs=%d\n", __func__, usecs);

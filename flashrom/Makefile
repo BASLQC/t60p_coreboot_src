@@ -39,6 +39,7 @@ CFLAGS  ?= -Os -Wall -Wshadow
 EXPORTDIR ?= .
 AR      ?= ar
 RANLIB  ?= ranlib
+DOSLIBS_BASE ?= ..
 # The following parameter changes the default programmer that will be used if there is no -p/--programmer
 # argument given when running flashrom. The predefined setting does not enable any default so that every
 # user has to declare the programmer he wants to use on every run. The rationale for this to be not set
@@ -51,6 +52,11 @@ RANLIB  ?= ranlib
 # evaluated below, namely those that enable/disable the various programmers).
 # Compilation will fail for unspecified values.
 CONFIG_DEFAULT_PROGRAMMER ?= PROGRAMMER_INVALID
+# The following adds a default parameter for the default programmer set above (only).
+CONFIG_DEFAULT_PROGRAMMER_ARGS ?= ''
+# Example: compiling with
+#   make CONFIG_DEFAULT_PROGRAMMER=PROGRAMMER_SERPROG CONFIG_DEFAULT_PROGRAMMER_ARGS="dev=/dev/ttyUSB0:1500000"
+# would make executing './flashrom' (almost) equivialent to './flashrom -p serprog:dev=/dev/ttyUSB0:1500000'.
 
 # If your compiler spits out excessive warnings, run make WARNERROR=no
 # You shouldn't have to change this flag.
@@ -97,13 +103,24 @@ CPPFLAGS += -I/usr/local/include
 LDFLAGS += -L/usr/local/lib
 endif
 
+ifeq ($(TARGET_OS), NetBSD)
+CPPFLAGS += -I/usr/pkg/include
+LDFLAGS += -L/usr/pkg/lib
+endif
+
+ifeq ($(TARGET_OS), DragonFlyBSD)
+CPPFLAGS += -I/usr/pkg/include
+LDFLAGS += -L/usr/pkg/lib
+endif
+
 ifeq ($(TARGET_OS), DOS)
 EXEC_SUFFIX := .exe
-CPPFLAGS += -I../libgetopt
+CPPFLAGS += -I$(DOSLIBS_BASE)/libgetopt
 # DJGPP has odd uint*_t definitions which cause lots of format string warnings.
 CFLAGS += -Wno-format
 # FIXME Check if we can achieve the same effect with -L../libgetopt -lgetopt
-LIBS += ../libgetopt/libgetopt.a
+LIBS += -lgetopt
+LDFLAGS += -L$(DOSLIBS_BASE)/libgetopt/
 # Bus Pirate, Serprog and PonyProg are not supported under DOS (missing serial support).
 ifeq ($(CONFIG_BUSPIRATE_SPI), yes)
 UNSUPPORTED_FEATURES += CONFIG_BUSPIRATE_SPI=yes
@@ -179,6 +196,16 @@ ifeq ($(CONFIG_ATAHPT), yes)
 UNSUPPORTED_FEATURES += CONFIG_ATAHPT=yes
 else
 override CONFIG_ATAHPT = no
+endif
+ifeq ($(CONFIG_ATAVIA), yes)
+UNSUPPORTED_FEATURES += CONFIG_ATAVIA=yes
+else
+override CONFIG_ATAVIA = no
+endif
+ifeq ($(CONFIG_IT8212), yes)
+UNSUPPORTED_FEATURES += CONFIG_IT8212=yes
+else
+override CONFIG_IT8212 = no
 endif
 ifeq ($(CONFIG_DRKAISER), yes)
 UNSUPPORTED_FEATURES += CONFIG_DRKAISER=yes
@@ -318,7 +345,7 @@ endif
 ###############################################################################
 # Flash chip drivers and bus support infrastructure.
 
-CHIP_OBJS = jedec.o stm50flw0x0x.o w39.o w29ee011.o \
+CHIP_OBJS = jedec.o stm50.o w39.o w29ee011.o \
 	sst28sf040.o m29f400bt.o 82802ab.o pm49fl00x.o \
 	sst49lfxxxc.o sst_fwhub.o flashchips.o spi.o spi25.o spi25_statusreg.o \
 	opaque.o sfdp.o en29lv640b.o at45db.o
@@ -326,21 +353,20 @@ CHIP_OBJS = jedec.o stm50flw0x0x.o w39.o w29ee011.o \
 ###############################################################################
 # Library code.
 
-LIB_OBJS = layout.o flashrom.o udelay.o programmer.o
+LIB_OBJS = layout.o flashrom.o udelay.o programmer.o helpers.o
 
 ###############################################################################
 # Frontend related stuff.
 
 CLI_OBJS = cli_classic.o cli_output.o print.o
 
-# Set the flashrom version string from the highest revision number
-# of the checked out flashrom files.
+# Set the flashrom version string from the highest revision number of the checked out flashrom files.
 # Note to packagers: Any tree exported with "make export" or "make tarball"
 # will not require subversion. The downloadable snapshots are already exported.
 SVNVERSION := $(shell ./util/getrevision.sh -u)
 
 RELEASE := 0.9.7
-VERSION := $(RELEASE)-r$(SVNVERSION)
+VERSION := $(RELEASE)-$(SVNVERSION)
 RELEASENAME ?= $(VERSION)
 
 SVNDEF := -D'FLASHROM_VERSION="$(VERSION)"'
@@ -372,6 +398,9 @@ CONFIG_SATASII ?= yes
 # Highpoint (HPT) ATA/RAID controller support.
 # IMPORTANT: This code is not yet working!
 CONFIG_ATAHPT ?= no
+
+# VIA VT6421A LPC memory support
+CONFIG_ATAVIA ?= yes
 
 # Always enable FT2232 SPI dongles for now.
 CONFIG_FT2232_SPI ?= yes
@@ -412,6 +441,9 @@ CONFIG_SATAMV ?= yes
 # Enable Linux spidev interface by default. We disable it on non-Linux targets.
 CONFIG_LINUX_SPI ?= yes
 
+# Always enable ITE IT8212F PATA controllers for now.
+CONFIG_IT8212 ?= yes
+
 # Disable wiki printing by default. It is only useful if you have wiki access.
 CONFIG_PRINT_WIKI ?= no
 
@@ -439,17 +471,38 @@ endif
 endif
 
 ###############################################################################
+# Handle CONFIG_* variables that depend on others set (and verified) above.
+
+# The external DMI decoder (dmidecode) does not work in libpayload. Bail out if the internal one got disabled.
+ifeq ($(TARGET_OS), libpayload)
+ifeq ($(CONFIG_INTERNAL), yes)
+ifeq ($(CONFIG_INTERNAL_DMI), no)
+UNSUPPORTED_FEATURES += CONFIG_INTERNAL_DMI=no
+else
+override CONFIG_INTERNAL_DMI = yes
+endif
+endif
+endif
+
+# Use internal DMI/SMBIOS decoder by default instead of relying on dmidecode.
+CONFIG_INTERNAL_DMI ?= yes
+
+###############################################################################
 # Programmer drivers and programmer support infrastructure.
 # Depending on the CONFIG_* variables set and verified above we set compiler flags and parameters below.
 
 FEATURE_CFLAGS += -D'CONFIG_DEFAULT_PROGRAMMER=$(CONFIG_DEFAULT_PROGRAMMER)'
+FEATURE_CFLAGS += -D'CONFIG_DEFAULT_PROGRAMMER_ARGS="$(CONFIG_DEFAULT_PROGRAMMER_ARGS)"'
 
 ifeq ($(CONFIG_INTERNAL), yes)
 FEATURE_CFLAGS += -D'CONFIG_INTERNAL=1'
-PROGRAMMER_OBJS += processor_enable.o chipset_enable.o board_enable.o cbtable.o dmi.o internal.o
+PROGRAMMER_OBJS += processor_enable.o chipset_enable.o board_enable.o cbtable.o internal.o
 ifeq ($(ARCH), x86)
 PROGRAMMER_OBJS += it87spi.o it85spi.o sb600spi.o amd_imc.o wbsio_spi.o mcp6x_spi.o
-PROGRAMMER_OBJS += ichspi.o ich_descriptors.o
+PROGRAMMER_OBJS += ichspi.o ich_descriptors.o dmi.o
+ifeq ($(CONFIG_INTERNAL_DMI), yes)
+FEATURE_CFLAGS += -D'CONFIG_INTERNAL_DMI=1'
+endif
 else
 endif
 NEED_PCI := yes
@@ -501,6 +554,18 @@ endif
 ifeq ($(CONFIG_ATAHPT), yes)
 FEATURE_CFLAGS += -D'CONFIG_ATAHPT=1'
 PROGRAMMER_OBJS += atahpt.o
+NEED_PCI := yes
+endif
+
+ifeq ($(CONFIG_ATAVIA), yes)
+FEATURE_CFLAGS += -D'CONFIG_ATAVIA=1'
+PROGRAMMER_OBJS += atavia.o
+NEED_PCI := yes
+endif
+
+ifeq ($(CONFIG_IT8212), yes)
+FEATURE_CFLAGS += -D'CONFIG_IT8212=1'
+PROGRAMMER_OBJS += it8212.o
 NEED_PCI := yes
 endif
 
@@ -612,9 +677,9 @@ PCILIBS += -lpciutils -lpci
 PCILIBS += -l$(shell uname -p)
 else
 ifeq ($(TARGET_OS), DOS)
-# FIXME There needs to be a better way to do this
-CPPFLAGS += -I../libpci/include
-PCILIBS += ../libpci/lib/libpci.a
+CPPFLAGS += -I$(DOSLIBS_BASE)/libpci/include
+LDFLAGS += -L$(DOSLIBS_BASE)/libpci/lib/
+PCILIBS += -lpci
 else
 PCILIBS += -lpci
 ifeq ($(TARGET_OS), OpenBSD)
@@ -650,7 +715,7 @@ FEATURE_LIBS += $(shell LC_ALL=C grep -q "NEEDLIBZ := yes" .libdeps && printf "%
 LIBFLASHROM_OBJS = $(CHIP_OBJS) $(PROGRAMMER_OBJS) $(LIB_OBJS)
 OBJS = $(CLI_OBJS) $(LIBFLASHROM_OBJS)
 
-all: hwlibs features $(PROGRAM)$(EXEC_SUFFIX)
+all: hwlibs features $(PROGRAM)$(EXEC_SUFFIX) $(PROGRAM).8
 ifeq ($(ARCH), x86)
 	@+$(MAKE) -C util/ich_descriptors_tool/ TARGET_OS=$(TARGET_OS) EXEC_SUFFIX=$(EXEC_SUFFIX)
 endif
@@ -674,7 +739,7 @@ TAROPTIONS = $(shell LC_ALL=C tar --version|grep -q GNU && echo "--owner=root --
 # This includes all frontends and libflashrom.
 # We don't use EXEC_SUFFIX here because we want to clean everything.
 clean:
-	rm -f $(PROGRAM) $(PROGRAM).exe libflashrom.a *.o *.d
+	rm -f $(PROGRAM) $(PROGRAM).exe libflashrom.a *.o *.d $(PROGRAM).8
 	@+$(MAKE) -C util/ich_descriptors_tool/ clean
 
 distclean: clean
@@ -713,11 +778,20 @@ compiler: featuresavailable
 	@echo $(TARGET_OS)|wc -w|grep -q '^[[:blank:]]*1[[:blank:]]*$$' ||	\
 		( echo "unknown. Aborting."; exit 1)
 	@printf "%s\n" '$(TARGET_OS)'
+ifeq ($(TARGET_OS), libpayload)
+	@$(CC) --version 2>&1 | grep -q coreboot || \
+		( echo "Warning: It seems you are not using coreboot's reference compiler."; \
+		  echo "This might work but usually does not, please beware." )
+endif
 
 define LIBPCI_TEST
 /* Avoid a failing test due to libpci header symbol shadowing breakage */
 #define index shadow_workaround_index
+#if !defined __NetBSD__ && !defined __DragonFly__
 #include <pci/pci.h>
+#else
+#include <pciutils/pci.h>
+#endif
 struct pci_access *pacc;
 int main(int argc, char **argv)
 {
@@ -868,16 +942,20 @@ endif
 	@$(DIFF) -q .features.tmp .features >/dev/null 2>&1 && rm .features.tmp || mv .features.tmp .features
 	@rm -f .featuretest.c .featuretest$(EXEC_SUFFIX)
 
-install: $(PROGRAM)$(EXEC_SUFFIX)
+$(PROGRAM).8: $(PROGRAM).8.tmpl
+	@sed -e '1 s#".*".*#"$(shell ./util/getrevision.sh -d $(PROGRAM).8.tmpl)" "$(VERSION)"#' <$< >$@
+
+install: $(PROGRAM)$(EXEC_SUFFIX) $(PROGRAM).8
 	mkdir -p $(DESTDIR)$(PREFIX)/sbin
 	mkdir -p $(DESTDIR)$(MANDIR)/man8
 	$(INSTALL) -m 0755 $(PROGRAM)$(EXEC_SUFFIX) $(DESTDIR)$(PREFIX)/sbin
 	$(INSTALL) -m 0644 $(PROGRAM).8 $(DESTDIR)$(MANDIR)/man8
 
-export:
+export: $(PROGRAM).8
 	@rm -rf $(EXPORTDIR)/flashrom-$(RELEASENAME)
 	@svn export -r BASE . $(EXPORTDIR)/flashrom-$(RELEASENAME)
 	@sed "s/^SVNVERSION.*/SVNVERSION := $(SVNVERSION)/" Makefile >$(EXPORTDIR)/flashrom-$(RELEASENAME)/Makefile
+	@cp $(PROGRAM).8 "$(EXPORTDIR)/flashrom-$(RELEASENAME)/$(PROGRAM).8"
 	@LC_ALL=C svn log >$(EXPORTDIR)/flashrom-$(RELEASENAME)/ChangeLog
 	@echo Exported $(EXPORTDIR)/flashrom-$(RELEASENAME)/
 
@@ -891,6 +969,6 @@ djgpp-dos: clean
 libpayload: clean
 	make CC="CC=i386-elf-gcc lpgcc" AR=i386-elf-ar RANLIB=i386-elf-ranlib
 
-.PHONY: all clean distclean compiler hwlibs features export tarball dos featuresavailable
+.PHONY: all install clean distclean compiler hwlibs features export tarball dos featuresavailable
 
 -include $(OBJS:.o=.d)
