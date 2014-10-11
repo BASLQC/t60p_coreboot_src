@@ -45,6 +45,6 @@ cd ..
 # remove powertop directory (included if the user is on Trisquel 6 and ran "powertop.trisquel6" script
 rm -rf powertop
 # remove the files in the "bin" directory (where the ROM's were moved to after last build)
-rm -rf bin/*
+#rm -rf bin/*
 
 # done
