@@ -66,7 +66,7 @@ read
 # insert VGA_BIOS_ID into t60 coreboot config files
 sed -i.bak "s/^\(CONFIG_VGA_BIOS_ID=\).*/\1\"$vgabios_vendor_id,$vgabios_device_id\"/" ../resources/t60p/t60p_coreboot.cfg
 sed -i.bak "s/^\(CONFIG_VGA_BIOS_ID=\).*/\1\"$vgabios_vendor_id,$vgabios_device_id\"/" ../resources/t60p/t60p_coreboot_serial.cfg
-sed -i.bak "s/^\(CONFIG_VGA_BIOS_ID=\).*/\1\"$vgabios_vendor_id,$vgabios_device_id\"/" ../resources/t60p_coreboot_seabios.cfg
+sed -i.bak "s/^\(CONFIG_VGA_BIOS_ID=\).*/\1\"$vgabios_vendor_id,$vgabios_device_id\"/" ../resources/t60p/t60p_coreboot_seabios.cfg
 
 cd ..
 
