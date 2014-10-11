@@ -7,13 +7,13 @@ echo "  *********************************************************************
         *********************************************************************"
 
 # Check for `resources/t60p/` folder
-if [ ! -d "resource/t60p" ]; then
+if [ ! -d "resources/t60p" ]; then
     echo 'The `./resources/t60p/` folder does not exist, aborting.'
     exit
 fi
 
 # Check for `resources/flashrom/` folder
-if [ ! -d "resource/t60p" ]; then
+if [ ! -d "resources/t60p" ]; then
     echo 'The `./resources/flashrom/` folder does not exist, so Flashrom will not be patched.'
 fi
 
